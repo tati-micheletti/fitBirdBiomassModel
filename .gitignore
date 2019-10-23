@@ -44,3 +44,4 @@ vignettes/*.pdf
 ./cache
 data/*.*
 data/
+.Rproj.user
