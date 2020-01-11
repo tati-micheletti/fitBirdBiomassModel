@@ -110,5 +110,7 @@ The main output is `covarTable`, which contains the covariates of the `glm` mode
 
 mySimOut$covarTable
 
+ (Intercept)     Pice_Eng     Pice_Gla     Pice_Mar     Pinu_Con     Popu_Tre     Pseu_Men 
+-0.755884580  0.009350159  0.015259595 -0.062907135 -0.009657841  0.006337240  0.040552720 
 ```
 
