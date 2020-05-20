@@ -15,8 +15,10 @@ This module creates a model using total biomass of soft and hardwood for Red-bre
 ```{r module_usage}
 
 library("SpaDES")
-usrEmail = if (pemisc::user() %in% c("Tati", "tmichele")) "tati.micheletti@gmail.com" else NULL
-googledrive::drive_auth(email = usrEmail)
+#usrEmail = if (pemisc::user() %in% c("Tati", "tmichele")) "tati.micheletti@gmail.com" else NULL
+#usrEmail = "0@01101.io"
+googledrive::drive_deauth()
+#googledrive::drive_auth(email = usrEmail)
 setPaths(modulePath = dirname(getwd()), cachePath = checkPath(file.path(getwd(), "cache"), create = TRUE),
          outputPath = checkPath(file.path(getwd(), "outputs"), create = TRUE),
          inputPath = checkPath(file.path(getwd(), "data"), create = TRUE))
@@ -26,17 +28,22 @@ times <- list(start = 1, end = 1)
 
 parameters <- list()
 
+templateRaster <- readRDS(file.path(getPaths()$inputPath, "studyArea.rds"))[[1]]
+#studyArea <- sf::as_Spatial(sf::st_as_sf(stars::st_as_stars(templateRaster), as_points = FALSE, merge = TRUE)) # requires the sf, sp, raster and stars packages
+
 # To determine the tree species to use
 
 modules <- list("fitBirdBiomassModel")
-objects <- list()
+#objects <- list("studyArea" = studyArea,
+#                "templateRaster" = templateRaster)
+objects <- list("templateRaster" = templateRaster)
 inputs <- list()
 outputs <- list()
 
-mySim <- simInit(times = times, params = parameters, modules = modules,
+sim <- simInit(times = times, params = parameters, modules = modules,
                  objects = objects)
 
-mySimOut <- spades(mySim)
+simOut <- spades(sim)
 ```
 
 
