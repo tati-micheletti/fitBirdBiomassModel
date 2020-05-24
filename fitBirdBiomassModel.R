@@ -17,7 +17,14 @@ defineModule(sim, list(
     defineParameter("woodType", "logical", FALSE, min, max, "Should the biomass of hard and softwood be summed (TRUE) or 
                     used as individual species (FALSE)?"),
     defineParameter("monthsToConsider", "numeric", 5:8, min, max, "Which months of the year should we consider for the dataset 
-                    (i.e. if we have differences in summer and winter)?")
+                    (i.e. if we have differences in summer and winter)?"),
+    defineParameter("yearsToConsider", "numeric", NULL, min, max, 
+                    "Which years should we consider for the dataset?"),
+    defineParameter("fixKNNageWithFRI", "logical", FALSE, min, max, 
+                    "Should ages from FRI be used to correct KNN data?"),
+    defineParameter("isBirdDTlonglat", "logical", FALSE, min, max, 
+                    paste0("If birdDT IS provided by the user, is it in longlat projection?",
+                           "If NOT, then need to be provided in the same projection as rasterTemplate"))
   ),
   inputObjects = bind_rows(
     expectsInput(objectName = "studyArea", objectClass = "shapefile", 
@@ -38,7 +45,19 @@ defineModule(sim, list(
                  sourceURL = NA),
     expectsInput(objectName = "dataArchive", objectClass = "character", 
                  desc = "name of the bird data archive: ie. ebd_CA-BC_rebnut_relAug-2019.zip", 
-                 sourceURL = NA)
+                 sourceURL = NA),
+    expectsInput(objectName = "hardwoodSpecies", objectClass = "character", 
+                 desc = "which species of the species list are considered hardwood", 
+                 sourceURL = NA),
+    expectsInput(objectName = "softwoodSpecies", objectClass = "character", 
+                 desc = "which species species list are considered softwood", 
+                 sourceURL = NA),
+    expectsInput(objectName = "covariateStack", objectClass = "RasterStack", 
+                 desc = paste0("If the user wants to provide extra layers, can pass here."), 
+                 sourceURL = NA),
+    createsOutput(objectName = "birdsDT", objectClass = "data.table", 
+                  desc = paste0("Bird dataset. Needs to contain counts for each coordinate.",
+                                " Mainly an output if I am using the eBird data. But can be provided."))
   ),
   outputObjects = bind_rows(
     createsOutput(objectName = "birdModel", objectClass = "list", 
@@ -48,9 +67,11 @@ defineModule(sim, list(
     createsOutput(objectName = "birdsDT", objectClass = "data.table", 
                   desc = "Bird dataset. Needs to contain counts for each coordinate"),
     createsOutput(objectName = "frstAttStk", objectClass = "RasterStack", 
-                  desc = "Knn (Biomass) Layer + LCC05"),
+                  desc = "Knn (Biomass) Layer + LCC05 + Age"),
     createsOutput(objectName = "dt", objectClass = "data.table", 
-                  desc = "Data table of counts and biomass to fit the models")
+                  desc = "Data table of counts and biomass to fit the models"),
+    createsOutput(objectName = "birdModel.step", objectClass = "", 
+                  desc = "AIC from model fitting")
     
   )
 ))
@@ -59,116 +80,167 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
-      
+      if (!is.null(sim$covariateStack)){
+        covariateStackNames <- names(covariateStack)
+        sim$covariateStack <- stack(lapply(sim$covariateStack, function(r){
+          ras <- postProces(r, studyArea = sim$studyArea, 
+                            rasterToMatch = sim$templateRaster,
+                            destinationPath = dataPath(sim),
+                            overwrite = TRUE,
+                            omitArgs = "overwrite",
+                            userTags = c("objectName:r",
+                                         "module:fitBirdBiomassModel"))
+          return(ras)
+        }))
+        names(sim$covariateStack) <- covariateStackNames
+      }
+        
       # schedule future event(s)
       sim <- scheduleEvent(sim, time(sim), "fitBirdBiomassModel", "prepData")
       sim <- scheduleEvent(sim, time(sim), "fitBirdBiomassModel", "createModels")
       sim <- scheduleEvent(sim, time(sim), "fitBirdBiomassModel", "createCovarTables")
-      
     },
     prepData = {
-
-      sim$studyArea <- spTransform(sim$studyArea, CRS('+init=epsg:3005'))
-        
-      LCC05 <- Cache(reproducible::prepInputs, 
-                     url = "https://drive.google.com/open?id=1ziUPnFZMamA5Yi6Hhex9aZKerXLpVxvz",
+      LCC05 <- prepInputs(url = "https://drive.google.com/open?id=1ziUPnFZMamA5Yi6Hhex9aZKerXLpVxvz",
                      targetFile = "LCC2005_V1_4a.tif",
                      studyArea = sim$studyArea, 
-                     #rasterToMatch = sim$templateRaster,
-                     useSAcrs = TRUE,
-                     destinationPath = dataPath(sim), 
-                     filename2 = "LCC05",
-                     overwrite = TRUE,
+                     rasterToMatch = sim$templateRaster,
+                     destinationPath = dataPath(sim),
                      method = "ngb", 
-                     omitArgs = "overwrite")
+                     overwrite = TRUE,
+                     omitArgs = "overwrite",
+                     userTags = c("objectName:LCC05", 
+                                  "module:fitBirdBiomassModel"))
       names(LCC05) <- "LCC05"
-      #browser()
-      #LCC05 <- projectRaster(LCC05, crs=CRS("+init=epsg:3005"))
-      
       
       # 2a. Get NFI kNN data for tree-species-wise proportions of total live above ground biomass (AGB), and crop it to the study area
       treespLayers <- stack(lapply(X = sim$treeSp, 
                                    function(sp){
-                                   return(Cache(reproducible::prepInputs, 
-                                                url = paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+                                   return(prepInputs(url = paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
                                                              "canada-forests-attributes_attributs-",
                                                              "forests-canada/2011-attributes_attributs-2011/",
                                                              "NFI_MODIS250m_2011_kNN_Species_", 
                                                              sp,
                                                              "_v1.tif"),
                                                 destinationPath = dataPath(sim),
-                                                studyArea = sim$studyArea, 
-                                                filename2 = paste0("KNN250m_", sp),
-                                                rasterToMatch = LCC05,
-                                                #rasterToMatch = sim$templateRaster,
-                                                overwrite = TRUE, 
-                                                omitArgs = "overwrite"))}))
+                                                overwrite = TRUE,
+                                                studyArea = sim$studyArea,
+                                                rasterToMatch = sim$templateRaster))}))
       names(treespLayers) <- sim$treeSp
       
       # 2b. Get NFI kNN data for merchantable volume, and crop it to the study area
-      mvolLayers <- stack(Cache(reproducible::prepInputs, 
-                                url = paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+      mvolLayers <- stack(prepInputs(url = paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
                                              "canada-forests-attributes_attributs-",
                                              "forests-canada/2011-attributes_attributs-2011/",
                                              "NFI_MODIS250m_2011_kNN_Structure_Volume_Merch_v1.tif"),
                                 destinationPath = dataPath(sim),
-                                studyArea = sim$studyArea, 
-                                filename2 = "KNN250m_mvol",
-                                #rasterToMatch = sim$templateRaster,
-                                rasterToMatch = LCC05, 
-                                overwrite = TRUE, 
-                                omitArgs = "overwrite"))
+                                studyArea = sim$studyArea,
+                                overwrite = TRUE,
+                                rasterToMatch = sim$templateRaster))
       names(mvolLayers) <- c("mvol")
-       
+      # 2c. Get both KNN and FRI data for Tree Age, and crop it to the study area. Use FRI data 
+      # for where it is available (i.e. 32% of the bird point counts)
+      ageLayer <- prepInputs(url = paste0("https://drive.google.com/open?id=19lJM",
+                                             "ILt3jee14dkrQZLq1UO_eyRaieUE"),
+                                   targetFile = "treeAgeRaster250m_BC.tif",
+                                   archive = "treeAgeRaster250m_BC.zip",
+                                   destinationPath = dataPath(sim),
+                                   studyArea = sim$studyArea,
+                             overwrite = TRUE,
+                                   rasterToMatch = sim$templateRaster)
+      names(ageLayer) <- c("ageLayer")
+      
+      ageLayer_KNN <- prepInputs(url = paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+                                                        "canada-forests-attributes_attributs-forests-canada/2011-",
+                                                        "attributes_attributs-2011/NFI_MODIS250m_2011_kNN_Structure",
+                                                        "_Stand_Age_v1.tif"),
+                                     destinationPath = dataPath(sim),
+                                     studyArea = sim$studyArea,
+                                     overwrite = TRUE,
+                                     rasterToMatch = sim$templateRaster)
+      names(ageLayer_KNN) <- c("ageLayer_KNN")
+
       # 3. Get the bird data from eBird's file
-      sim$birdsDT <- Cache(eBirdDataLoading, pathData = dataPath(sim),
-                           url = sim$dataURL,
-                           targetFile = sim$dataFile,
-                           archive = sim$dataArchive,
-                           monthsToConsider = P(sim)$monthsToConsider, 
-                           yearToConsider = 2005, userTags = "eBird")
-      
-      projxy <- spTransform(SpatialPoints(cbind(sim$birdsDT$x, sim$birdsDT$y), 
-                                               proj4string=CRS("+proj=longlat")), 
-                                 CRS("+init=epsg:3005"))@coords
-      
-      sim$birdsDT$x <- projxy[, 1]
-      sim$birdsDT$y <- projxy[, 2]
+      if (is.null(sim$birdsDT)){
+        sim$birdsDT <- Cache(eBirdDataLoading, pathData = dataPath(sim),
+                             url = sim$dataURL,
+                             targetFile = sim$dataFile,
+                             archive = sim$dataArchive,
+                             monthsToConsider = P(sim)$monthsToConsider, 
+                             yearToConsider = P(sim)$yearsToConsider, 
+                             userTags = "eBird")
+      }
+      if (P(sim)$isBirdDTlonglat){
+        # eBird is projected as latlong; we need to fix it to the same projection
+        # of the otehr objects in the simulation: we use sim$templateRaster's projection
+        projxy <- spTransform(x = SpatialPoints(cbind(sim$birdsDT$x, sim$birdsDT$y), 
+                                                proj4string = CRS("+proj=longlat")), 
+                              CRSobj = crs(sim$templateRaster))
+        projxy <- as.data.table(coordinates(projxy))
+        names(projxy) <- c("x", "y")
+        sim$birdsDT[, c("x", "y") := projxy]
+      }
 
       # 4. Extract from LCC05 and knn the species' biomasses per species and the LCC cover type
       treespLayers <- 0.01 * treespLayers * mvolLayers # convert to merch vol density (m3/ha)
       names(treespLayers) <- sim$treeSp
-      #browser()
-      
-      sim$frstAttStk <- raster::stack(treespLayers, LCC05)
+      sim$frstAttStk <- raster::stack(treespLayers, LCC05, ageLayer, ageLayer_KNN, 
+                                      sim$covariateStack)
       valuesStack <- data.table(raster::extract(sim$frstAttStk, 
                                                 data.table(x = sim$birdsDT$x, 
                                                            y = sim$birdsDT$y)))
-
+      # 6. Make up the table with: observationCounts, biomass softwood, biomass hardwood
+      sim$dt <- cbind(valuesStack, sim$birdsDT)
+      # Filter points to boreal forest
+      sim$dt <- na.omit(sim$dt, col = "ageLayer_KNN")
       # 5. Sum the biomass of each type of tree: softwood or hardwood
       if (P(sim)$woodType){
-        valuesStack[, softwood := sum(.SD), by = 1:NROW(valuesStack), 
+        sim$dt[, softwood := sum(.SD), by = 1:NROW(sim$dt), 
                     .SDcols = sim$softwoodSpecies]
-        valuesStack[, hardwood := sum(.SD), by = 1:NROW(valuesStack), 
+        sim$dt[, hardwood := sum(.SD), by = 1:NROW(sim$dt), 
                     .SDcols = sim$hardwoodSpecies]
       }
-      #browser()
-      # 6. Make up the table with: observationCounts, biomass softwood, biomass hardwood
-      sim$dt <- cbind(valuesStack, observationCounts = sim$birdsDT$observationCounts)
+      # Correct age in relation to KNN. 
+      sim$dt[, ageLayer_KNN := ageLayer_KNN-(2011-as.numeric(YEAR))] # Correcting the KNN data to match
+                                                                     # bird data
+      # Negative numbers mean we don't know the real forest age at the time of observation, then, 
+      # need to exclude
+      sim$dt <- sim$dt[ageLayer_KNN >= 0, ]
       
+      if (P(sim)$fixKNNageWithFRI){
+        sim$dt[is.na(ageLayer), ageLayer := ageLayer_KNN] # Using FRI age where for we have it 
+        sim$dt[, ageLayer_KNN := NULL]
+        names(sim$dt)[names(sim$dt) == "ageLayer"] <- "ageLayer_KNN"
+      }
+      names(sim$dt)[names(sim$dt) == "ageLayer_KNN"] <- "age"
     },
     createModels = {
-      formula <- ifelse(P(sim)$woodType,
-                        "observationCounts ~ softwood + hardwood",
-                        paste0("observationCounts ~ ",
-                               paste(usefulFuns::grepMulti(x = names(sim$dt), patterns = "_"), 
-                                     collapse = " + ")))
-      #browser()
-      # 7. Make the glm models:  observationCounts ~ softwood + hardwood biomass
+      if (is.null(sim$formula)){
+        if (P(sim)$woodType){
+          formula <- "observationCounts ~ softwood + hardwood + age"
+        } else {
+          #cleanup
+          toKeep <- c(sim$treeSp, "observationCounts", "age")
+          sim$dt <- sim$dt[, ..toKeep]
+          # Remove columns with only 0
+          sim$dt
+          sim$dt <- sim$dt[, colSums(sim$dt != 0) > 0, with = FALSE]
+          formula <- paste0("observationCounts ~ ",
+                            paste(names(sim$dt)[names(sim$dt) != "observationCounts"], 
+                                  collapse = " + "))
+        }
+      } else {
+        formula <- sim$formula
+      }
+      # 7. Make the glm models:  observationCounts ~ softwood + hardwood biomass or by species or 
+      # own passed model
       sim$birdModel <- glm(data = sim$dt,
                            formula = formula,
                            family = "poisson")
-      sim$birdModel.step <- MASS::stepAIC(sim$birdModel, trace = TRUE)
+      print(summary(sim$birdModel))
+
+      if (length(sim$birdModel$coefficients)-1 > 1)
+        sim$birdModel.step <- MASS::stepAIC(sim$birdModel, trace = TRUE)
     },
     createCovarTables = {
       # 8. Get the covariates and put it on a table
@@ -186,91 +258,88 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
   
   if(!suppliedElsewhere("studyArea", sim)){
-    # HACK ##############
-    # Not sure where to define sim$studyArea so that is counts as "suppliedElsewhere",
-    # so hard-coding it into here to get the thing running for the RIA landbase.
-    sim$studyArea <- usefulFuns::provinceBCRStudyArea(province = "British Columbia", country = "Canada")
-    #####################
+    sim$studyArea <- Cache(usefulFuns::provinceBCRStudyArea, 
+                           province = "British Columbia", 
+                           country = "Canada", userTags = c("objectName:studyArea", 
+                                                            "module:inputObjects"))
   }
-  
-  if(!suppliedElsewhere("sppEquivCol", sim)){
-    sim$sppEquivCol <- "PSP"
+  if(!suppliedElsewhere("templateRaster", sim)){
+    sim$templateRaster <- prepInputs(url = paste0("https://drive.google.com/open?id=19lJM",
+                                                  "ILt3jee14dkrQZLq1UO_eyRaieUE"),
+                                     targetFile = "treeAgeRaster250m_BC.tif",
+                                     archive = "treeAgeRaster250m_BC.zip",
+                                     destinationPath = Paths$inputPath,
+                                         userTags = c("objectName:templateRaster",
+                                                      "module:inputObjects")
+    )
   }
-  
+  if(!suppliedElsewhere("birdsDT", sim)){
+    params(sim)$fitBirdBiomassModel$isBirdDTlonglat <- TRUE
+    warning("birdsDT was not supplied, so eBird data will be used. 
+Therefore, fitBirdBiomassModel will be turned TRUE", immediate = TRUE)
+  }
   if(!suppliedElsewhere("treeSp", sim)){
-    #sim$treeSp <- c("Pice_Eng", "Pice_Gla", "Pice_Mar", "Pinu_Con", "Popu_Tre", "Pseu_Men")
-    # from the RIA ws3 model:
-    # x  'douglas_fir',
-    # x  'white_spruce', 
-    # x  'subalpine_fir',
-    # x  'poplar',
-    # x  'western_white_pine',
-    # x  'willow',
-    # x  'mountain_hemlock',
-    # x  'black_spruce',
-    # x  'alpine_larch',
-    # x  'whitebark_pine',
-    # x  'spruce',
-    # x  'amabilis_fir',
-    # x  'cottonwood',
-    # x  'tamarack',
-    # x  'engelmann_spruce',
-    # x  'aspen',
-    # x  'western_hemlock',
-    # x  'balsam_fir',
-    # x  'lodgepole_pine',
-    # x 'redcedar',
-    # x  'paper_birch'
+    # from the RIA ws3 model. Choose the species you want by commenting out (#)
+    # the ones you don't want. You can also specify other species in other areas, but 
+    # don't forget to specify which species are hardwood and which are 
+    # softwood if you change the species to another area that not BC.
     sim$treeSp <- c(
-                    #"Pice_Eng", # engelmann_spruce
-                    "Pice_Gla", # while_spruce
+                    "Pice_Eng", # engelmann_spruce
+                    "Pice_Gla", # white_spruce
                     "Pice_Mar", # black_spruce
                     "Pinu_Con", # lodgepole_pine
                     "Popu_Tre", # aspen
-                    #"Pseu_Men", # douglas_fir
-                    #"Abie_Las", # subalpine_fir
-                    #"Popu_Spp", # poplar
-                    #"Pinu_Mon", # western_white_pine
-                    #"Sali_Spp", # willow
-                    #"Tsug_Mer", # mountain_hemlock
-                    #"Lari_Lya", # alpine_larch
-                    #"Pinu_Alb", # whitebark_pine
+                    "Pseu_Men", # douglas_fir
+                    "Abie_Las", # subalpine_fir
+                    "Popu_Spp", # poplar
+                    "Pinu_Mon", # western_white_pine
+                    "Sali_Spp", # willow
+                    "Tsug_Mer", # mountain_hemlock
+                    "Lari_Lya", # alpine_larch
+                    "Pinu_Alb", # whitebark_pine
                     "Pice_Spp", # spruce
-                    #"Abie_Ama", # amabilis_fir
-                    #"Popu_Tri", # cottonwood (black?)
-                    #"Lari_Lar", # tamarack
-                    #"Tsug_Het", # western_hemlock
-                    #"Abie_Bal", # balsam_fir
-                    #"Thuj_Pli", # redcedar
+                    "Abie_Ama", # amabilis_fir
+                    "Popu_Tri", # cottonwood (black?)
+                    "Lari_Lar", # tamarack
+                    "Tsug_Het", # western_hemlock
+                    "Abie_Bal", # balsam_fir
+                    "Thuj_Pli", # redcedar
                     "Betu_Pap"  # paper_birch
     )
-    # sim$treeSp <- c("Pice_Mar", # black_spruce
-    #                 "Popu_Spp", # poplar
-    #                 "Lari_Lya", # alpine_larch
-    #                 "Lari_Lar", # tamarack
-    #                 "Pinu_Alb") # whitebark_pine)
   }
-  
-  if(!suppliedElsewhere("sppEquiv", sim)){
-    # Equivalency table for tree species
-    data("sppEquivalencies_CA", package = "LandR")
-    # Make BC spp equivalencies
-    sppEquivalencies_CA <- sppEquivalencies_CA[KNN %in% sim$treeSp,]
-    sim$sppEquiv <- sppEquivalencies_CA
-  }
-  
+
   if (!suppliedElsewhere("softwoodSpecies")){
-    sim$softwoodSpecies <- c("Pice_Mar", "Lari_Lya", "Lari_Lar", "Pinu_Alb")
-    #sim$softwoodSpecies <- c("Pice_Eng", "Pice_Gla", "Pice_Mar",
-    #                         "Pinu_Con", "Pseu_Men")
-    #if (!sim$softwoodSpecies %in% sim$treeSp) stop("Softwood species default is not matching treeSp. 
-    #                                               Please provide 'softwoodSpecies' to match 'treeSp'")
+    sim$softwoodSpecies <- c(
+      "Pice_Eng", # engelmann_spruce
+      "Pice_Gla", # white_spruce
+      "Pice_Mar", # black_spruce
+      "Pinu_Con", # lodgepole_pine
+      "Pseu_Men", # douglas_fir
+      "Abie_Las", # subalpine_fir
+      "Pinu_Mon", # western_white_pine
+      "Tsug_Mer", # mountain_hemlock
+      "Lari_Lya", # alpine_larch
+      "Pinu_Alb", # whitebark_pine
+      "Pice_Spp", # spruce
+      "Abie_Ama", # amabilis_fir
+      "Lari_Lar", # tamarack
+      "Tsug_Het", # western_hemlock
+      "Abie_Bal", # balsam_fir
+      "Thuj_Pli" # redcedar
+    )
+    if (!all(sim$softwoodSpecies %in% sim$treeSp)) stop("Softwood species default is not matching treeSp.
+                                                  Please provide 'softwoodSpecies' to match 'treeSp'")
   }
   if (!suppliedElsewhere("hardwoodSpecies")){
-    sim$hardwoodSpecies <- c("Popu_Spp")
-    #sim$hardwoodSpecies <- c("Popu_Tre")
-    #if (!sim$hardwoodSpecies %in% sim$treeSp) stop("Hardwood species default is not matching treeSp. 
-    #                                               Please provide 'softwoodSpecies' to match 'treeSp'")
+    sim$hardwoodSpecies <- c(
+      "Popu_Tre", # aspen
+      "Popu_Spp", # poplar
+      "Sali_Spp", # willow
+      "Popu_Tri", # cottonwood (black?)
+      "Betu_Pap"  # paper_birch
+    )
+    if (!all(sim$hardwoodSpecies %in% sim$treeSp)) stop("Hardwood species default is not matching treeSp.
+                                                  Please provide 'softwoodSpecies' to match 'treeSp'")
   }
   if (!suppliedElsewhere("dataURL")){
     sim$dataURL <- extractURL(objectName = "dataURL")

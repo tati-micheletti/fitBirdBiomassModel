@@ -13,12 +13,10 @@ This module creates a model using total biomass of soft and hardwood for Red-bre
 # Usage
 
 ```{r module_usage}
-
 library("SpaDES")
-#usrEmail = if (pemisc::user() %in% c("Tati", "tmichele")) "tati.micheletti@gmail.com" else NULL
+usrEmail = if (pemisc::user() %in% c("Tati", "tmichele")) "tati.micheletti@gmail.com" else NULL
 #usrEmail = "0@01101.io"
-googledrive::drive_deauth()
-#googledrive::drive_auth(email = usrEmail)
+googledrive::drive_auth(email = usrEmail)
 setPaths(modulePath = dirname(getwd()), cachePath = checkPath(file.path(getwd(), "cache"), create = TRUE),
          outputPath = checkPath(file.path(getwd(), "outputs"), create = TRUE),
          inputPath = checkPath(file.path(getwd(), "data"), create = TRUE))
@@ -26,24 +24,46 @@ getPaths() # shows where the 4 relevant paths are
 
 times <- list(start = 1, end = 1)
 
-parameters <- list()
+parameters <- list(
+  "fitBirdBiomassModel" = list(
+    "woodType" = FALSE
+  ))
 
-templateRaster <- readRDS(file.path(getPaths()$inputPath, "studyArea.rds"))[[1]]
-#studyArea <- sf::as_Spatial(sf::st_as_sf(stars::st_as_stars(templateRaster), as_points = FALSE, merge = TRUE)) # requires the sf, sp, raster and stars packages
+templateRaster <- prepInputs(url = paste0("https://drive.google.com/open?id=19lJM",
+                                    "ILt3jee14dkrQZLq1UO_eyRaieUE"),
+                       targetFile = "treeAgeRaster250m_BC.tif",
+                       archive = "treeAgeRaster250m_BC.zip",
+                       destinationPath = Paths$inputPath)
+
+studyArea <- usefulFuns::provinceBCRStudyArea(province = c("British Columbia", "Alberta", "Northwest Territories"), 
+                                              country = "Canada")
+
+boreal <- defineStudyArea(testArea = TRUE, specificTestArea = "boreal", destinationFolder = Paths$inputPath)
+boreal <- boreal[boreal@data$TYPE == "BOREAL",]
+
+studyArea <- projectInputs(studyArea, targetCRS = crs(templateRaster))
+studyArea <- postProcess(studyArea, studyArea = boreal)
+
+# birdsDT <- prepareBirdDT()
 
 # To determine the tree species to use
-
 modules <- list("fitBirdBiomassModel")
-#objects <- list("studyArea" = studyArea,
-#                "templateRaster" = templateRaster)
-objects <- list("templateRaster" = templateRaster)
+objects <- list("studyArea" = studyArea,
+               "templateRaster" = templateRaster,
+               # CANADA WARBLER
+               "dataURL" = "https://drive.google.com/open?id=1tfcLOEwgL5vMmKRQFlWYk9T9f1U-XUs7",
+               "dataFile" = "ebd_CA-AB_canwar_relApr-2020.txt",
+               "dataArchive" = "ebd_CA-AB_canwar_relApr-2020.zip",
+               # ONE OPTION:
+               # "formula" = paste0("observationCounts ~ Pice_Mar + Popu_Tre + age")
+               # ANOTHER OPTION:
+                "formula" = paste0("observationCounts ~ age")
+               ) 
 inputs <- list()
 outputs <- list()
 
-sim <- simInit(times = times, params = parameters, modules = modules,
+sim <- simInitAndSpades(times = times, params = parameters, modules = modules,
                  objects = objects)
-
-simOut <- spades(sim)
 ```
 
 
