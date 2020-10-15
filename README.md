@@ -8,7 +8,7 @@ output:
 ---
 # Overview
 
-This module creates a model using total biomass of soft and hardwood for Red-breasted Nuthatch (RBNUinBC). The covariates can be used in an anticipation function for harvesting.
+This module creates a model using total biomass of soft and hardwood for Canada Warbler. The covariates can be used in an anticipation function for harvesting.
 
 # Usage
 
