@@ -1,14 +1,14 @@
 ---
 title: "fitBirdBiomassModel"
 author: "Tati Micheletti"
-date: "18 October 2019"
+date: "10 October 2020"
 output:
   html_document:
     df_print: paged
 ---
 # Overview
 
-This module creates a model using total biomass of soft and hardwood for Canada Warbler. The covariates can be used in an anticipation function for harvesting.
+This module creates a model using total biomass of soft and hardwood for a boreal songbird (i.e. Canada Warbler). The covariates can be used in an anticipation function for harvesting.
 
 # Usage
 
