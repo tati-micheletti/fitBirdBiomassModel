@@ -1,14 +1,15 @@
 ---
 title: "fitBirdBiomassModel"
 author: "Tati Micheletti"
-date: "18 October 2019"
+date: "12 December 2020"
 output:
   html_document:
     df_print: paged
 ---
 # Overview
 
-This module creates a model using total biomass of soft and hardwood for Red-breasted Nuthatch (RBNUinBC). The covariates can be used in an anticipation function for harvesting.
+This module creates a model using total biomass of soft and hardwood for Canada Warbler for the RIA region. 
+The covariates can be used in an anticipation function for harvesting.
 
 # Usage
 
