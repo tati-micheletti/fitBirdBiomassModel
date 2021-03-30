@@ -116,9 +116,9 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
       names(LCC05) <- "LCC05"
       
       # 2a. Get NFI kNN data for tree-species-wise proportions of total live above ground biomass (AGB), and crop it to the study area
-      treespLayers <- stack(lapply(X = sim$treeSp, 
+      treespLays <- lapply(X = sim$treeSp, 
                                    function(sp){
-                                   return(prepInputs(url = paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+                                    ras <- prepInputs(url = paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
                                                              "canada-forests-attributes_attributs-",
                                                              "forests-canada/2011-attributes_attributs-2011/",
                                                              "NFI_MODIS250m_2011_kNN_Species_", 
@@ -129,7 +129,11 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
                                                 filename2 = file.path(dataPath(sim), paste0(sp, "_biomass.tif")),
                                                 overwrite = TRUE,
                                                 studyArea = sim$studyArea,
-                                                rasterToMatch = sim$templateRaster))}))
+                                                rasterToMatch = sim$templateRaster)
+                                    ras[] <- ras[]
+                                   return(ras)
+                                     })
+      treespLayers <- raster::stack(treespLays)
       names(treespLayers) <- sim$treeSp
       
       # 2b. Get NFI kNN data for merchantable volume, and crop it to the study area
@@ -191,7 +195,6 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
       # 4. Extract from LCC05 and knn the species' biomasses per species and the LCC cover type
       treespLayers <- 0.01 * treespLayers * mvolLayers # convert to merch vol density (m3/ha)
       names(treespLayers) <- sim$treeSp
-      browser()
       ageLayer <- postProcess(ageLayer, rasterToMatch = LCC05)
       sim$frstAttStk <- raster::stack(treespLayers, LCC05, ageLayer, ageLayer_KNN, 
                                       sim$covariateStack)
