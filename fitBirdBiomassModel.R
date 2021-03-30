@@ -175,7 +175,7 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
         # of the otehr objects in the simulation: we use sim$templateRaster's projection
         projxy <- spTransform(x = SpatialPoints(cbind(sim$birdsDT$x, sim$birdsDT$y), 
                                                 proj4string = CRS("+proj=longlat")), 
-                              CRSobj = crs(sim$templateRaster))
+                              CRSobj = raster::crs(LCC05))
         projxy <- as.data.table(coordinates(projxy))
         names(projxy) <- c("x", "y")
         sim$birdsDT[, c("x", "y") := projxy]
@@ -184,6 +184,7 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
       # 4. Extract from LCC05 and knn the species' biomasses per species and the LCC cover type
       treespLayers <- 0.01 * treespLayers * mvolLayers # convert to merch vol density (m3/ha)
       names(treespLayers) <- sim$treeSp
+      ageLayer <- postProcess(ageLayer, rasterToMatch = LCC05)
       sim$frstAttStk <- raster::stack(treespLayers, LCC05, ageLayer, ageLayer_KNN, 
                                       sim$covariateStack)
       valuesStack <- data.table(raster::extract(sim$frstAttStk, 
