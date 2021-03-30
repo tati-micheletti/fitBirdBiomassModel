@@ -26,7 +26,7 @@ defineModule(sim, list(
                     paste0("If birdDT IS provided by the user, is it in longlat projection?",
                            "If NOT, then need to be provided in the same projection as rasterTemplate"))
   ),
-  inputObjects = bind_rows(
+  inputObjects = bindrows(
     expectsInput(objectName = "studyArea", objectClass = "shapefile", 
                  desc = "Should be BC, otherwise need to pass the correct data", 
                  sourceURL = ""),
@@ -59,7 +59,7 @@ defineModule(sim, list(
                   desc = paste0("Bird dataset. Needs to contain counts for each coordinate.",
                                 " Mainly an output if I am using the eBird data. But can be provided."))
   ),
-  outputObjects = bind_rows(
+  outputObjects = bindrows(
     createsOutput(objectName = "birdModel", objectClass = "list", 
                   desc = "list with model objects of each one of the species"),
     createsOutput(objectName = "covarTable", objectClass = "list", 
@@ -101,12 +101,14 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
       sim <- scheduleEvent(sim, time(sim), "fitBirdBiomassModel", "createCovarTables")
     },
     prepData = {
+      sim$templateRaster[] <- sim$templateRaster[]
       LCC05 <- prepInputs(url = "https://drive.google.com/open?id=1ziUPnFZMamA5Yi6Hhex9aZKerXLpVxvz",
                      targetFile = "LCC2005_V1_4a.tif",
                      studyArea = sim$studyArea, 
                      rasterToMatch = sim$templateRaster,
                      destinationPath = dataPath(sim),
                      method = "ngb", 
+                     useGDAL = FALSE,
                      overwrite = TRUE,
                      omitArgs = "overwrite",
                      userTags = c("objectName:LCC05", 
@@ -123,6 +125,7 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
                                                              sp,
                                                              "_v1.tif"),
                                                 destinationPath = dataPath(sim),
+                                                useGDAL = FALSE,
                                                 overwrite = TRUE,
                                                 studyArea = sim$studyArea,
                                                 rasterToMatch = sim$templateRaster))}))
@@ -134,6 +137,7 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
                                              "forests-canada/2011-attributes_attributs-2011/",
                                              "NFI_MODIS250m_2011_kNN_Structure_Volume_Merch_v1.tif"),
                                 destinationPath = dataPath(sim),
+                                useGDAL = FALSE,
                                 studyArea = sim$studyArea,
                                 overwrite = TRUE,
                                 rasterToMatch = sim$templateRaster))
@@ -145,6 +149,7 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
                                    targetFile = "treeAgeRaster250m_BC.tif",
                                    archive = "treeAgeRaster250m_BC.zip",
                                    destinationPath = dataPath(sim),
+                             useGDAL = FALSE,
                                    studyArea = sim$studyArea,
                              overwrite = TRUE,
                                    rasterToMatch = sim$templateRaster)
@@ -155,6 +160,7 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
                                                         "attributes_attributs-2011/NFI_MODIS250m_2011_kNN_Structure",
                                                         "_Stand_Age_v1.tif"),
                                      destinationPath = dataPath(sim),
+                                 useGDAL = FALSE,
                                      studyArea = sim$studyArea,
                                      overwrite = TRUE,
                                      rasterToMatch = sim$templateRaster)
