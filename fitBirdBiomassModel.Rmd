@@ -34,23 +34,16 @@ parameters <- list(
     "woodType" = FALSE
   ))
 
+urlSA <- "https://drive.google.com/file/d/1LxacDOobTrRUppamkGgVAUFIxNT4iiHU/view?usp=sharing"
+
+studyArea <- prepInputs(url = urlSA,
+                       destinationPath = Paths$inputPath)
+
 templateRaster <- prepInputs(url = paste0("https://drive.google.com/open?id=19lJM",
                                     "ILt3jee14dkrQZLq1UO_eyRaieUE"),
                        targetFile = "treeAgeRaster250m_BC.tif",
                        archive = "treeAgeRaster250m_BC.zip",
                        destinationPath = Paths$inputPath)
-
-studyArea <- usefulFuns::provinceBCRStudyArea(province = c("British Columbia", 
-                                                           "Alberta", 
-                                                           "Northwest Territories"), 
-                                              country = "Canada")
-
-boreal <- defineStudyArea(testArea = TRUE, specificTestArea = "boreal", 
-                          destinationFolder = Paths$inputPath)
-boreal <- boreal[boreal@data$TYPE == "BOREAL",]
-
-studyArea <- projectInputs(studyArea, targetCRS = raster::crs(templateRaster))
-studyArea <- postProcess(studyArea, studyArea = boreal)
 
 # To determine the tree species to use
 modules <- list("fitBirdBiomassModel")
