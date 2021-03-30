@@ -126,6 +126,7 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
                                                              "_v1.tif"),
                                                 destinationPath = dataPath(sim),
                                                 useGDAL = FALSE,
+                                                filename2 = file.path(dataPath(sim), paste0(sp, "_biomass.tif")),
                                                 overwrite = TRUE,
                                                 studyArea = sim$studyArea,
                                                 rasterToMatch = sim$templateRaster))}))
@@ -190,6 +191,7 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
       # 4. Extract from LCC05 and knn the species' biomasses per species and the LCC cover type
       treespLayers <- 0.01 * treespLayers * mvolLayers # convert to merch vol density (m3/ha)
       names(treespLayers) <- sim$treeSp
+      browser()
       ageLayer <- postProcess(ageLayer, rasterToMatch = LCC05)
       sim$frstAttStk <- raster::stack(treespLayers, LCC05, ageLayer, ageLayer_KNN, 
                                       sim$covariateStack)
