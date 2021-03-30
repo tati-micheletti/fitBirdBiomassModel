@@ -1,19 +1,24 @@
 ---
 title: "fitBirdBiomassModel"
 author: "Tati Micheletti"
-date: "18 October 2019"
+date: "08 December 2020"
 output:
   html_document:
     df_print: paged
 ---
 # Overview
 
-This module creates a model using total biomass of soft and hardwood for Red-breasted Nuthatch (RBNUinBC). The covariates can be used in an anticipation function for harvesting.
+This module creates a model using total biomass of soft and hardwood for Canada Warbler. The covariates can be used in an anticipation function for harvesting.
 
 # Usage
 
 ```{r module_usage}
-library("SpaDES")
+require("Require")
+Require("SpaDES")
+Require("PredictiveEcology/pemisc")
+Require("googledrive")
+Require("tati-micheletti/usefulFuns")
+
 usrEmail = if (pemisc::user() %in% c("Tati", "tmichele")) "tati.micheletti@gmail.com" else NULL
 #usrEmail = "0@01101.io"
 googledrive::drive_auth(email = usrEmail)
@@ -35,16 +40,17 @@ templateRaster <- prepInputs(url = paste0("https://drive.google.com/open?id=19lJ
                        archive = "treeAgeRaster250m_BC.zip",
                        destinationPath = Paths$inputPath)
 
-studyArea <- usefulFuns::provinceBCRStudyArea(province = c("British Columbia", "Alberta", "Northwest Territories"), 
+studyArea <- usefulFuns::provinceBCRStudyArea(province = c("British Columbia", 
+                                                           "Alberta", 
+                                                           "Northwest Territories"), 
                                               country = "Canada")
 
-boreal <- defineStudyArea(testArea = TRUE, specificTestArea = "boreal", destinationFolder = Paths$inputPath)
+boreal <- defineStudyArea(testArea = TRUE, specificTestArea = "boreal", 
+                          destinationFolder = Paths$inputPath)
 boreal <- boreal[boreal@data$TYPE == "BOREAL",]
 
-studyArea <- projectInputs(studyArea, targetCRS = crs(templateRaster))
+studyArea <- projectInputs(studyArea, targetCRS = raster::crs(templateRaster))
 studyArea <- postProcess(studyArea, studyArea = boreal)
-
-# birdsDT <- prepareBirdDT()
 
 # To determine the tree species to use
 modules <- list("fitBirdBiomassModel")
@@ -55,9 +61,9 @@ objects <- list("studyArea" = studyArea,
                "dataFile" = "ebd_CA-AB_canwar_relApr-2020.txt",
                "dataArchive" = "ebd_CA-AB_canwar_relApr-2020.zip",
                # ONE OPTION:
-               # "formula" = paste0("observationCounts ~ Pice_Mar + Popu_Tre + age")
+               "formula" = paste0("observationCounts ~ Pice_Mar + Popu_Tre + age")
                # ANOTHER OPTION:
-                "formula" = paste0("observationCounts ~ age")
+                # "formula" = paste0("observationCounts ~ age")
                ) 
 inputs <- list()
 outputs <- list()
@@ -89,9 +95,9 @@ By default, all the data needed is automatically downloaded from GDrive. The dat
 
 ```{r url, echo = TRUE, eval = FALSE}
 objects <- list(
-  "dataURL" = "https://drive.google.com/open?id=1hUvj5PHNDWe1VWZReciBUt4wQHAF3Gw5",
-  "dataFile" = "ebd_CA-BC_rebnut_relAug-2019.txt",
-  "dataArchive" = "ebd_CA-BC_rebnut_relAug-2019.zip"
+  "dataURL" = "https://drive.google.com/open?id = 1tfcLOEwgL5vMmKRQFlWYk9T9f1U - XUs7",
+  "dataFile" = "ebd_CA - AB_canwar_relApr - 2020.txt",
+  "dataArchive" = "ebd_CA - AB_canwar_relApr - 2020.zip"
 )
 ```
 
