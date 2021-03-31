@@ -8,11 +8,16 @@ output:
 ---
 # Overview
 
-This module creates a model using total biomass of soft and hardwood for Canada Warbler. The covariates can be used in an anticipation function for harvesting.
+This module creates a model using total biomass of soft and hardwood for Red-breasted Nuthatch. The covariates can be used in an anticipation function for harvesting.
 
 # Usage
 
 ```{r module_usage}
+
+# Make sure you have the most updated raster and sp versions
+install.packages("raster")
+install.packages("sp")
+
 require("Require")
 Require("SpaDES")
 Require("PredictiveEcology/pemisc")
@@ -31,7 +36,7 @@ times <- list(start = 1, end = 1)
 
 parameters <- list(
   "fitBirdBiomassModel" = list(
-    "woodType" = FALSE
+    "woodType" = TRUE
   ))
 
 urlSA <- "https://drive.google.com/file/d/1LxacDOobTrRUppamkGgVAUFIxNT4iiHU/view?usp=sharing"
@@ -39,22 +44,29 @@ urlSA <- "https://drive.google.com/file/d/1LxacDOobTrRUppamkGgVAUFIxNT4iiHU/view
 studyArea <- prepInputs(url = urlSA,
                        destinationPath = Paths$inputPath)
 
-templateRaster <- prepInputs(url = paste0("https://drive.google.com/open?id=19lJM",
-                                    "ILt3jee14dkrQZLq1UO_eyRaieUE"),
-                       targetFile = "treeAgeRaster250m_BC.tif",
-                       archive = "treeAgeRaster250m_BC.zip",
-                       destinationPath = Paths$inputPath)
+templateRaster <- prepInputs(url = paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+                                                        "canada-forests-attributes_attributs-forests-canada/2011-",
+                                                        "attributes_attributs-2011/NFI_MODIS250m_2011_kNN_Structure",
+                                                        "_Stand_Age_v1.tif"),
+                                     destinationPath = Paths$inputPath,
+                                     useGDAL = FALSE,
+                                     studyArea = studyArea,
+                                     overwrite = TRUE)
 
 # To determine the tree species to use
 modules <- list("fitBirdBiomassModel")
 objects <- list("studyArea" = studyArea,
                "templateRaster" = templateRaster,
-               # CANADA WARBLER
-               "dataURL" = "https://drive.google.com/open?id=1tfcLOEwgL5vMmKRQFlWYk9T9f1U-XUs7",
-               "dataFile" = "ebd_CA-AB_canwar_relApr-2020.txt",
-               "dataArchive" = "ebd_CA-AB_canwar_relApr-2020.zip",
+               # CANADA WARBLER (ALBERTA)
+               # "dataURL" = "https://drive.google.com/open?id=1tfcLOEwgL5vMmKRQFlWYk9T9f1U-XUs7",
+               # "dataFile" = "ebd_CA-AB_canwar_relApr-2020.txt",
+               # "dataArchive" = "ebd_CA-AB_canwar_relApr-2020.zip"
+               # Red-breasted Nuthatch (BC)
+               "dataURL" = "https://drive.google.com/file/d/1hUvj5PHNDWe1VWZReciBUt4wQHAF3Gw5/view?usp=sharing",
+               "dataFile" = "ebd_CA-BC_rebnut_relAug-2019.txt",
+               "dataArchive" = "ebd_CA-BC_rebnut_relAug-2019.zip"
                # ONE OPTION:
-               "formula" = paste0("observationCounts ~ Pice_Mar + Popu_Tre + age")
+               # "formula" = paste0("observationCounts ~ Pice_Mar + Popu_Tre + age")
                # ANOTHER OPTION:
                 # "formula" = paste0("observationCounts ~ age")
                ) 
@@ -134,7 +146,7 @@ And pass the tree species that compose soft and the ones that compose hardwood. 
 The main output is `covarTable`, which contains the covariates of the `glm` model. It can be accessed:
 ```{r covarTable, echo = TRUE, eval = FALSE}
 
-mySimOut$covarTable
+sim$covarTable
 
 ```
 

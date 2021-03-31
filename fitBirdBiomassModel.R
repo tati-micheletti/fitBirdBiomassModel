@@ -12,7 +12,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "fitBirdBiomassModel.Rmd"),
   #reqdPkgs = list("raster", "data.table", "reproducible", "magrittr", "tati-micheletti/usefun@master"),
-  reqdPkgs = list("raster", "data.table", "reproducible", "magrittr", "PredictiveEcology/usefulFuns"),
+  reqdPkgs = list("raster", "sp", "data.table", "reproducible", "magrittr", "PredictiveEcology/usefulFuns"),
   parameters = rbind(
     defineParameter("woodType", "logical", FALSE, min, max, "Should the biomass of hard and softwood be summed (TRUE) or 
                     used as individual species (FALSE)?"),
@@ -139,7 +139,7 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
       treespLayers <- raster::stack(treespLays)
       names(treespLayers) <- sim$treeSp
       writeRaster(treespLayers, filename = treeSpStk, 
-                  format = "GTiff")
+                  format = "GTiff", overwrite = TRUE)
       treespLayers <- raster::stack(treeSpStk)
       names(treespLayers) <- sim$treeSp
       } else {
@@ -147,7 +147,7 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
         names(treespLayers) <- sim$treeSp
         }
       # 2b. Get NFI kNN data for merchantable volume, and crop it to the study area
-      mvolLayers <- stack(prepInputs(url = paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+      mvolLayers <- prepInputs(url = paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
                                              "canada-forests-attributes_attributs-",
                                              "forests-canada/2011-attributes_attributs-2011/",
                                              "NFI_MODIS250m_2011_kNN_Structure_Volume_Merch_v1.tif"),
@@ -155,7 +155,8 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
                                 useGDAL = FALSE,
                                 studyArea = sim$studyArea,
                                 overwrite = TRUE,
-                                rasterToMatch = sim$templateRaster))
+                                rasterToMatch = sim$templateRaster)
+      mvolLayers <- raster::stack(mvolLayers)
       names(mvolLayers) <- c("mvol")
       # 2c. Get both KNN and FRI data for Tree Age, and crop it to the study area. Use FRI data 
       # for where it is available (i.e. 32% of the bird point counts)
@@ -193,11 +194,10 @@ doEvent.fitBirdBiomassModel = function(sim, eventTime, eventType) {
       }
       if (P(sim)$isBirdDTlonglat){
         # eBird is projected as latlong; we need to fix it to the same projection
-        # of the otehr objects in the simulation: we use sim$templateRaster's projection
-        projxy <- spTransform(x = SpatialPoints(cbind(sim$birdsDT$x, sim$birdsDT$y), 
-                                                proj4string = CRS("+proj=longlat")), 
-                              CRSobj = raster::crs(LCC05))
-        projxy <- as.data.table(coordinates(projxy))
+        spPoints <- sp::SpatialPoints(cbind(sim$birdsDT$x, sim$birdsDT$y),
+                                      proj4string = raster::crs("+proj=longlat"))
+        projxy <- projectInputs(x = spPoints, targetCRS = raster::crs(LCC05))
+        projxy <- as.data.table(sp::coordinates(projxy))
         names(projxy) <- c("x", "y")
         sim$birdsDT[, c("x", "y") := projxy]
       }
