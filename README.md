@@ -1,14 +1,14 @@
 ---
 title: "fitBirdBiomassModel"
 author: "Tati Micheletti"
-date: "12 December 2020"
+date: "31 March 2021"
 output:
   html_document:
     df_print: paged
 ---
 # Overview
 
-This module creates a model using total biomass of soft and hardwood for Canada Warbler for the RIA region. 
+This module creates a model using total biomass of soft and hardwood for Red-breasted nuthatch for the RIA region. 
 The covariates can be used in an anticipation function for harvesting.
 
 # Usage
@@ -107,11 +107,36 @@ And pass the tree species that compose soft and the ones that compose hardwood. 
 ## Output data
 
 The main output is `covarTable`, which contains the covariates of the `glm` model. It can be accessed:
+
 ```{r covarTable, echo = TRUE, eval = FALSE}
 
-mySimOut$covarTable
+> summary(sim$birdModel)
 
- (Intercept)     Pice_Eng     Pice_Gla     Pice_Mar     Pinu_Con     Popu_Tre     Pseu_Men 
--0.755884580  0.009350159  0.015259595 -0.062907135 -0.009657841  0.006337240  0.040552720 
+Call:
+glm(formula = formula, family = "poisson", data = sim$dt)
+
+Deviance Residuals: 
+    Min       1Q   Median       3Q      Max  
+-4.1769  -0.9952  -0.7171   0.0821  20.1344  
+
+Coefficients:
+              Estimate Std. Error z value Pr(>|z|)    
+(Intercept)  7.594e-01  5.684e-03  133.60   <2e-16 ***
+softwood     2.181e-03  2.114e-05  103.19   <2e-16 ***
+hardwood    -1.176e-02  2.697e-04  -43.62   <2e-16 ***
+age         -8.235e-04  5.925e-05  -13.90   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for poisson family taken to be 1)
+
+    Null deviance: 184252  on 63135  degrees of freedom
+Residual deviance: 169747  on 63132  degrees of freedom
+AIC: 319047
+
+Number of Fisher Scoring iterations: 6
+
+> sim$covarTable
+  (Intercept)      softwood      hardwood           age 
+ 0.7594492894  0.0021811110 -0.0117632087 -0.0008234927
 ```
-
