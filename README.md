@@ -43,7 +43,8 @@ mySimOut <- spades(mySim)
 
 # Events
 
-prepData
+prepData  
+
     1. Get knn data for biomass, crop it to the study area  
     2. Get LCC05 data -- we assume all classifications match 2001  
     3. Get the bird data from eBird's file  
