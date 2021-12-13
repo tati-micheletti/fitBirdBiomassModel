@@ -63,9 +63,9 @@ By default, all the data needed is automatically downloaded from GDrive. The dat
 
 ```{r url, echo = TRUE, eval = FALSE}
 objects <- list(
-  "dataURL" = "https://drive.google.com/open?id = 1tfcLOEwgL5vMmKRQFlWYk9T9f1U - XUs7",
-  "dataFile" = "ebd_CA - AB_canwar_relApr - 2020.txt",
-  "dataArchive" = "ebd_CA - AB_canwar_relApr - 2020.zip"
+               "dataURL" = "https://drive.google.com/file/d/1hUvj5PHNDWe1VWZReciBUt4wQHAF3Gw5/view?usp=sharing",
+               "dataFile" = "ebd_CA-BC_rebnut_relAug-2019.txt",
+               "dataArchive" = "ebd_CA-BC_rebnut_relAug-2019.zip"
 )
 ```
 
