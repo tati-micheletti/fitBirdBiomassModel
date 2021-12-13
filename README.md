@@ -51,9 +51,7 @@ prepData
     4. Extract from LCC05 and knn the species' biomasses per species and the LCC cover type  
     5. Sum the biomass of each type of tree: softwood or hardwood  
     6. Make up the table with: observationCounts, biomass softwood, biomass hardwood  
-createModels  
     7. Make the glm models:  observationCounts ~ softwood + hardwood biomass  
-createCovarTables  
     8. Get the covariates and put it on a table  
 
 # Data dependencies
