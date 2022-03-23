@@ -15,14 +15,16 @@ This module creates a model using total biomass of soft and hardwood for Red-bre
 ```{r module_usage}
 
 # Make sure you have the most updated raster and sp versions
-install.packages("raster")
-install.packages("sp")
-
-require("Require")
+if(!require("Require")){
+  install.packages("Require")
+}
+library("Require")
+Require("raster")
+Require("sp")
 Require("SpaDES")
 Require("PredictiveEcology/pemisc")
 Require("googledrive")
-Require("tati-micheletti/usefulFuns")
+Require("usefulFuns")
 
 usrEmail = if (pemisc::user() %in% c("Tati", "tmichele")) "tati.micheletti@gmail.com" else NULL
 #usrEmail = "0@01101.io"
